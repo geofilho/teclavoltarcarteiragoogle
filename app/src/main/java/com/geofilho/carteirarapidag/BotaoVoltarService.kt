@@ -25,6 +25,10 @@ class BotaoVoltarService : AccessibilityService() {
 
     private val handler = Handler(Looper.getMainLooper())
     private var ultimaTroca = 0L
+    private var tentativas = 0
+
+    /** Último app que apareceu na frente. */
+    private var pacoteNaFrente: String? = null
 
     /** A Carteira do Google já apareceu na tela depois que o app ligou o NFC. */
     private var viuGoogleWallet = false
@@ -62,6 +66,10 @@ class BotaoVoltarService : AccessibilityService() {
         if (event == null || event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val pacote = event.packageName?.toString() ?: return
         if (pacote != packageName) Carteiras.registrarAppDetectado(this, pacote)
+        pacoteNaFrente = pacote
+        if (Carteiras.ehSamsungWallet(pacote) || pacote == Carteiras.GOOGLE_WALLET) {
+            Carteiras.registrar(this, "abriu $pacote / ${event.className}")
+        }
 
         if (Carteiras.ehSamsungWallet(pacote)) {
             trocarSamsungWallet()
@@ -71,20 +79,50 @@ class BotaoVoltarService : AccessibilityService() {
     }
 
     private fun trocarSamsungWallet() {
+        if (!Carteiras.googleWalletInstalada(this)) {
+            Carteiras.registrar(this, "Carteira do Google não instalada: nada feito")
+            return
+        }
         val agora = SystemClock.uptimeMillis()
-        if (agora - ultimaTroca < INTERVALO_MINIMO_MS) return
-        if (!Carteiras.googleWalletInstalada(this)) return // sem ela, deixa a Samsung Wallet abrir
+        val reabriu = agora - ultimaTroca < JANELA_INSISTIR_MS
+        if (reabriu) {
+            // A Samsung Wallet voltou logo depois da troca: insiste, até um limite
+            if (tentativas >= MAX_TENTATIVAS) {
+                Carteiras.registrar(this, "limite de tentativas atingido")
+                return
+            }
+            tentativas++
+            Carteiras.registrar(this, "Samsung Wallet voltou: abrindo a Carteira do Google de novo ($tentativas)")
+            handler.postDelayed({ abrirDestino() }, ATRASO_TROCA_MS)
+            return
+        }
         ultimaTroca = agora
+        tentativas = 0
+        Carteiras.registrar(this, "troca: mostrador + Carteira do Google")
 
         // Manda a Samsung Wallet para trás; assim, ao sair da Carteira do Google, ela não reaparece
         performGlobalAction(GLOBAL_ACTION_HOME)
-        handler.postDelayed({
-            if (Carteiras.nfcDesligado(this)) {
-                ConfirmaNfcActivity.abrir(this, ConfirmaNfcActivity.MODO_LIGAR)
-            } else {
-                Carteiras.abrirGoogleWallet(this)
-            }
-        }, ATRASO_TROCA_MS)
+        handler.postDelayed({ abrirDestino() }, ATRASO_TROCA_MS)
+        // Confere depois de um tempo se a Samsung Wallet não ficou por cima
+        handler.postDelayed({ conferir() }, CONFERIR_MS)
+        handler.postDelayed({ conferir() }, CONFERIR_MS * 2)
+    }
+
+    private fun abrirDestino() {
+        if (Carteiras.nfcDesligado(this)) {
+            ConfirmaNfcActivity.abrir(this, ConfirmaNfcActivity.MODO_LIGAR)
+        } else {
+            val ok = Carteiras.abrirGoogleWallet(this)
+            if (!ok) Carteiras.registrar(this, "falha ao abrir a Carteira do Google")
+        }
+    }
+
+    private fun conferir() {
+        if (Carteiras.ehSamsungWallet(pacoteNaFrente) && tentativas < MAX_TENTATIVAS) {
+            tentativas++
+            Carteiras.registrar(this, "Samsung Wallet ainda na frente: abrindo de novo ($tentativas)")
+            abrirDestino()
+        }
     }
 
     /** Só age quando foi o app que ligou o NFC. */
@@ -118,7 +156,9 @@ class BotaoVoltarService : AccessibilityService() {
     }
 
     private companion object {
-        const val INTERVALO_MINIMO_MS = 2_000L
+        const val JANELA_INSISTIR_MS = 5_000L
+        const val MAX_TENTATIVAS = 3
+        const val CONFERIR_MS = 900L
         const val ATRASO_TROCA_MS = 250L
         const val ATRASO_NFC_MS = 400L
 

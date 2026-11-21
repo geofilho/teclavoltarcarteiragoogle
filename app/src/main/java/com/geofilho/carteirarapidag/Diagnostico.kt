@@ -51,6 +51,11 @@ object Diagnostico {
             appendLine("Últimos apps que abriram (mais recente primeiro):")
             if (apps.isEmpty()) appendLine("- nenhum")
             apps.forEach { appendLine("- $it") }
+            appendLine()
+            appendLine("Registro de eventos (mais antigo primeiro):")
+            val reg = Carteiras.registro(context)
+            if (reg.isEmpty()) appendLine("- vazio")
+            reg.forEach { appendLine(it) }
         }
     }
 

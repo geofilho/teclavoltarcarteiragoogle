@@ -109,6 +109,22 @@ object Carteiras {
         prefs.edit().putString(CHAVE_APPS_DETECTADOS, nova.joinToString("\n")).apply()
     }
 
+    private const val CHAVE_REGISTRO = "registro_eventos"
+
+    /** Registro com horário dos últimos eventos, para o diagnóstico. */
+    fun registrar(context: Context, linha: String) {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val hora = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.ROOT).format(java.util.Date())
+        val atual = registro(context)
+        val nova = (atual + "$hora $linha").takeLast(25)
+        prefs.edit().putString(CHAVE_REGISTRO, nova.joinToString("\n")).apply()
+    }
+
+    fun registro(context: Context): List<String> =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(CHAVE_REGISTRO, "")!!
+            .split("\n").filter { it.isNotBlank() }
+
     fun appsDetectados(context: Context): List<String> =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getString(CHAVE_APPS_DETECTADOS, "")!!
