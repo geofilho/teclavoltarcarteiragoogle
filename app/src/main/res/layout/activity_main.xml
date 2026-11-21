@@ -40,6 +40,12 @@
             android:visibility="gone" />
 
         <Button
+            android:id="@+id/btn_nfc"
+            style="@style/BotaoG"
+            android:text="@string/btn_nfc"
+            android:visibility="gone" />
+
+        <Button
             android:id="@+id/btn_testar"
             style="@style/BotaoG"
             android:text="@string/btn_testar"

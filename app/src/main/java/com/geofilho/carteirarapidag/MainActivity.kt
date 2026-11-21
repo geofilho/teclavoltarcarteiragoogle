@@ -17,6 +17,7 @@ class MainActivity : Activity() {
     private lateinit var btnAtivar: Button
     private lateinit var btnInstalar: Button
     private lateinit var btnTestar: Button
+    private lateinit var btnNfc: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -27,10 +28,12 @@ class MainActivity : Activity() {
         btnAtivar = findViewById(R.id.btn_ativar)
         btnInstalar = findViewById(R.id.btn_instalar)
         btnTestar = findViewById(R.id.btn_testar)
+        btnNfc = findViewById(R.id.btn_nfc)
 
         btnAtivar.setOnClickListener { abrirAjustesAcessibilidade() }
         btnInstalar.setOnClickListener { Carteiras.abrirLojaGoogleWallet(this) }
         btnTestar.setOnClickListener { Carteiras.abrirGoogleWallet(this) }
+        btnNfc.setOnClickListener { Carteiras.abrirAjustesNfc(this) }
         findViewById<Button>(R.id.btn_como_usar).setOnClickListener {
             startActivity(Intent(this, ComoUsarActivity::class.java))
         }
@@ -46,16 +49,19 @@ class MainActivity : Activity() {
     private fun atualizar() {
         val temGoogle = Carteiras.googleWalletInstalada(this)
         val ativo = Carteiras.servicoAtivo(this)
+        val nfcDesligado = Carteiras.nfcDesligado(this)
 
         status.setText(
             when {
                 !temGoogle -> R.string.status_sem_google
                 !ativo -> R.string.status_falta_permissao
+                nfcDesligado -> R.string.status_nfc_desligado
                 else -> R.string.status_pronto
             }
         )
         btnInstalar.visibility = if (temGoogle) View.GONE else View.VISIBLE
         btnAtivar.visibility = if (ativo) View.GONE else View.VISIBLE
+        btnNfc.visibility = if (nfcDesligado) View.VISIBLE else View.GONE
         btnTestar.visibility = if (temGoogle) View.VISIBLE else View.GONE
     }
 

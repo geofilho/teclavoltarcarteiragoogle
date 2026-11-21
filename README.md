@@ -15,6 +15,8 @@ Pode aparecer um piscar rápido da Samsung Wallet antes da troca.
 - Se o relógio não avisar (a Samsung pode reservar o botão), a Carteira do Google abre sempre que a Samsung Wallet abrir.
 - Se a Carteira do Google não estiver instalada, o app não interfere e avisa na tela.
 
+Sobre o NFC: nenhum app comum consegue ligar o NFC, porque o Android só permite isso aos apps do sistema. Se o NFC estiver desligado, o app avisa na tela e o botão **Ligar NFC** leva direto para a chave. Basta ligar uma vez.
+
 O app não lê a tela, não usa internet, não bloqueia nenhum botão e não guarda dados.
 
 ## Baixar

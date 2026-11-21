@@ -5,6 +5,8 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.nfc.NfcAdapter
+import android.provider.Settings
 import android.view.accessibility.AccessibilityManager
 
 /** Tudo o que o app precisa saber sobre as duas carteiras. */
@@ -52,6 +54,29 @@ object Carteiras {
             context.startActivity(loja)
         } catch (e: Exception) {
             // Sem Play Store acessível: não há o que fazer além de avisar na tela
+        }
+    }
+
+    /** Verdadeiro se o relógio tem NFC e ele está desligado. Apps comuns não podem ligar o NFC. */
+    fun nfcDesligado(context: Context): Boolean {
+        val nfc = NfcAdapter.getDefaultAdapter(context) ?: return false
+        return !nfc.isEnabled
+    }
+
+    /** Abre a tela onde a pessoa liga o NFC. */
+    fun abrirAjustesNfc(context: Context) {
+        val tentativas = listOf(
+            Intent(Settings.ACTION_NFC_SETTINGS),
+            Intent(Settings.ACTION_WIRELESS_SETTINGS),
+            Intent(Settings.ACTION_SETTINGS),
+        )
+        for (intent in tentativas) {
+            try {
+                context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                return
+            } catch (e: Exception) {
+                // tenta a próxima
+            }
         }
     }
 
