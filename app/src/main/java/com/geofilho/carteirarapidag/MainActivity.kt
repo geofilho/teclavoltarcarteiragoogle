@@ -33,7 +33,7 @@ class MainActivity : Activity() {
         btnAtivar.setOnClickListener { abrirAjustesAcessibilidade() }
         btnInstalar.setOnClickListener { Carteiras.abrirLojaGoogleWallet(this) }
         btnTestar.setOnClickListener { Carteiras.abrirGoogleWallet(this) }
-        btnNfc.setOnClickListener { Carteiras.abrirAjustesNfc(this) }
+        btnNfc.setOnClickListener { Carteiras.ligarNfcEVoltar(this) }
         findViewById<Button>(R.id.btn_como_usar).setOnClickListener {
             startActivity(Intent(this, ComoUsarActivity::class.java))
         }
@@ -41,6 +41,10 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        // Se voltou para cá depois de ligar o NFC (caso o serviço não tenha aberto antes), segue para a Carteira
+        if (!Carteiras.nfcDesligado(this) && Carteiras.consumirEsperaNfc(this) &&
+            Carteiras.abrirGoogleWallet(this)
+        ) return
         atualizar()
         // Permite rolar a tela girando a moldura do relógio
         rolagem.requestFocus()

@@ -63,6 +63,31 @@ object Carteiras {
         return !nfc.isEnabled
     }
 
+    private const val PREFS = "carteira_rapida_g"
+    private const val CHAVE_ESPERANDO_NFC = "esperando_nfc_desde"
+    private const val ESPERA_NFC_MS = 3 * 60 * 1000L
+
+    /** Lembra que, assim que o NFC for ligado, a Carteira do Google deve abrir sozinha. */
+    fun marcarEsperaNfc(context: Context) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putLong(CHAVE_ESPERANDO_NFC, System.currentTimeMillis()).apply()
+    }
+
+    /** Devolve verdadeiro (e limpa o aviso) se a pessoa foi ligar o NFC há pouco tempo. */
+    fun consumirEsperaNfc(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val desde = prefs.getLong(CHAVE_ESPERANDO_NFC, 0L)
+        if (desde == 0L) return false
+        prefs.edit().remove(CHAVE_ESPERANDO_NFC).apply()
+        return System.currentTimeMillis() - desde < ESPERA_NFC_MS
+    }
+
+    /** Abre a chave do NFC e, quando ele for ligado, a Carteira do Google abre sozinha. */
+    fun ligarNfcEVoltar(context: Context) {
+        marcarEsperaNfc(context)
+        abrirAjustesNfc(context)
+    }
+
     /** Abre a tela onde a pessoa liga o NFC. */
     fun abrirAjustesNfc(context: Context) {
         val tentativas = listOf(
