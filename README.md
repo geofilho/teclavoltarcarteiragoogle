@@ -11,7 +11,7 @@ A Samsung não deixa nenhum app mudar a função de segurar o botão Voltar. Por
 
 Pode aparecer um piscar rápido antes da troca. A Samsung Wallet também é trocada quando aberta pela lista de apps. Para usar a Samsung Wallet, desligue o serviço. Se a Carteira do Google não estiver instalada, o app não interfere e avisa na tela.
 
-Não precisa da permissão de sobreposição de tela. O Android 14+ (o relógio está no Android 17) bloqueia em silêncio apps que abrem telas em segundo plano. Por isso o serviço primeiro mostra uma camada própria de acessibilidade por cima da Samsung Wallet, com "Abrindo Carteira do Google" ou a pergunta do NFC, e, com ela visível, abre a Carteira do Google.
+Não precisa da permissão de sobreposição de tela. O Android 14+ (o relógio está no Android 17) bloqueia em silêncio apps que abrem telas em segundo plano. Por isso o serviço primeiro mostra uma camada própria de acessibilidade por cima da Samsung Wallet, com "Abrindo Carteira do Google" ou a pergunta do NFC, e, com ela visível, abre a Carteira do Google. Depois confere qual app ficou de fato na frente. Se a Carteira do Google não estiver na frente, tenta de novo; se ainda assim não der, pergunta **Abrir Carteira do Google?**, e o toque em Sim libera a abertura.
 
 ### NFC
 

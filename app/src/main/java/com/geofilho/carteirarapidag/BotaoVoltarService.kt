@@ -16,6 +16,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityWindowInfo
 import android.widget.Button
 import android.widget.TextView
 
@@ -39,6 +40,9 @@ class BotaoVoltarService : AccessibilityService() {
 
     private var ultimaTroca = 0L
     private var tentativas = 0
+
+    /** A Carteira do Google mandou evento de abertura depois do nosso pedido. */
+    private var googleAvisouAbertura = false
 
     /** A Carteira do Google já apareceu na tela depois que o app ligou o NFC. */
     private var viuGoogleWallet = false
@@ -91,9 +95,9 @@ class BotaoVoltarService : AccessibilityService() {
             return
         }
         if (pacote == Carteiras.GOOGLE_WALLET) {
-            if (camada?.tag == TAG_ABRINDO) {
-                Carteiras.registrar(this, "Carteira do Google na frente: tirando a camada")
-                removerCamada()
+            if (camada?.tag == TAG_ABRINDO && !googleAvisouAbertura) {
+                googleAvisouAbertura = true
+                Carteiras.registrar(this, "Carteira do Google avisou abertura; topo=${pacoteDoTopo()}")
             }
             if (Carteiras.nfcLigadoPeloApp(this)) viuGoogleWallet = true
             return
@@ -128,24 +132,82 @@ class BotaoVoltarService : AccessibilityService() {
         if (Carteiras.nfcDesligado(this)) mostrarPerguntaLigar() else abrirCarteiraComCamada()
     }
 
-    /** Cobre a tela, abre a Carteira do Google e tira a camada quando ela aparecer. */
+    /** Cobre a tela, abre a Carteira do Google e confere se ela ficou mesmo na frente. */
     private fun abrirCarteiraComCamada() {
         val view = inflar(R.layout.camada_abrindo)
         if (view != null) {
             view.tag = TAG_ABRINDO
             if (!mostrarCamada(view)) Carteiras.registrar(this, "sem camada; abrindo direto")
         }
-        handler.postDelayed({
-            val ok = Carteiras.abrirGoogleWallet(this)
-            Carteiras.registrar(this, if (ok) "pedido para abrir a Carteira do Google" else "falha ao abrir a Carteira do Google")
-        }, ATRASO_ABRIR_MS)
-        // Se a Carteira do Google não aparecer, não deixa a camada presa na tela
-        handler.postDelayed({
-            if (camada?.tag == TAG_ABRINDO) {
-                Carteiras.registrar(this, "Carteira do Google não apareceu em $LIMITE_CAMADA_MS ms")
-                removerCamada()
+        googleAvisouAbertura = false
+        handler.postDelayed({ pedirGoogleWallet() }, ATRASO_ABRIR_MS)
+        handler.postDelayed({ verificar(1) }, VERIFICAR_MS)
+    }
+
+    private fun pedirGoogleWallet() {
+        val ok = Carteiras.abrirGoogleWallet(this)
+        Carteiras.registrar(this, if (ok) "pedido para abrir a Carteira do Google" else "falha ao abrir a Carteira do Google")
+    }
+
+    /**
+     * Confere qual app está realmente na frente.
+     * 1ª vez: se não for a Carteira do Google, pede de novo.
+     * 2ª vez: se ainda não for, mostra a pergunta "Abrir Carteira do Google?" (o toque libera a abertura).
+     */
+    private fun verificar(etapa: Int) {
+        if (camada?.tag != TAG_ABRINDO) return
+        val topo = pacoteDoTopo()
+        Carteiras.registrar(this, "verificação $etapa: topo=$topo; janelas=${descreverJanelas()}")
+        val naFrente = topo == Carteiras.GOOGLE_WALLET || (topo == null && googleAvisouAbertura)
+        if (naFrente) {
+            removerCamada()
+            return
+        }
+        when (etapa) {
+            1 -> {
+                pedirGoogleWallet()
+                handler.postDelayed({ verificar(2) }, VERIFICAR_MS)
             }
-        }, LIMITE_CAMADA_MS)
+            2 -> mostrarPergunta(R.string.pergunta_abrir_carteira, sim = {
+                Carteiras.registrar(this, "Abrir Carteira do Google? sim")
+                val v = inflar(R.layout.camada_abrindo)
+                if (v != null) {
+                    v.tag = TAG_ABRINDO
+                    mostrarCamada(v)
+                }
+                googleAvisouAbertura = false
+                pedirGoogleWallet()
+                handler.postDelayed({ verificar(3) }, VERIFICAR_MS)
+            }, nao = {
+                Carteiras.registrar(this, "Abrir Carteira do Google? não")
+                removerCamada()
+            }).also { Carteiras.registrar(this, "mostrou Abrir Carteira do Google?") }
+            else -> removerCamada() // última conferência: não deixa a camada presa
+        }
+    }
+
+    /** Pacote do app que está na frente (janela de aplicativo mais alta). */
+    private fun pacoteDoTopo(): String? = try {
+        windows.filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
+            .maxByOrNull { it.layer }
+            ?.root?.packageName?.toString()
+    } catch (e: Exception) {
+        null
+    }
+
+    private fun descreverJanelas(): String = try {
+        windows.sortedByDescending { it.layer }.joinToString(" > ") { w ->
+            val tipo = when (w.type) {
+                AccessibilityWindowInfo.TYPE_APPLICATION -> "app"
+                AccessibilityWindowInfo.TYPE_SYSTEM -> "sistema"
+                AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY -> "camada"
+                AccessibilityWindowInfo.TYPE_INPUT_METHOD -> "teclado"
+                else -> "outro"
+            }
+            "$tipo:${w.root?.packageName ?: w.title}"
+        }
+    } catch (e: Exception) {
+        "indisponível"
     }
 
     private fun mostrarPerguntaLigar() {
@@ -260,7 +322,7 @@ class BotaoVoltarService : AccessibilityService() {
         const val ATRASO_ABRIR_MS = 150L
         const val ATRASO_TIRAR_MS = 600L
         const val ATRASO_NFC_MS = 400L
-        const val LIMITE_CAMADA_MS = 4_000L
+        const val VERIFICAR_MS = 1_000L
 
         /** Telas que aparecem por cima da Carteira do Google sem que a pessoa tenha saído dela. */
         val PACOTES_IGNORADOS = setOf(
