@@ -7,7 +7,7 @@ App para Wear OS (feito para o Galaxy Watch Ultra 2, funciona do Galaxy Watch 4 
 A Samsung não deixa nenhum app mudar a função de segurar o botão Voltar. Por isso o app usa um serviço de acessibilidade:
 
 1. Você segura o botão Voltar e a Samsung Wallet começa a abrir.
-2. O serviço manda a Samsung Wallet para trás e abre a Carteira do Google no lugar.
+2. O serviço fecha a Samsung Wallet (gesto de voltar) e abre a Carteira do Google no lugar, com a autorização de abertura em segundo plano que o Android 14+ exige.
 
 Pode aparecer um piscar rápido antes da troca. A Samsung Wallet também é trocada quando aberta pela lista de apps. Para usar a Samsung Wallet, desligue o serviço. Se a Carteira do Google não estiver instalada, o app não interfere e avisa na tela.
 

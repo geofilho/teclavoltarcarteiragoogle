@@ -124,8 +124,10 @@ class BotaoVoltarService : AccessibilityService() {
             Carteiras.registrar(this, "Samsung Wallet voltou: tentativa $tentativas")
         } else {
             tentativas = 0
-            val home = performGlobalAction(GLOBAL_ACTION_HOME)
-            Carteiras.registrar(this, "troca iniciada (mostrador: ${if (home) "ok" else "falhou"})")
+            // "Voltar" fecha a Samsung Wallet. Não usa "mostrador": apertar o início faz o Android
+            // bloquear por alguns segundos a abertura de outros apps.
+            val voltar = performGlobalAction(GLOBAL_ACTION_BACK)
+            Carteiras.registrar(this, "troca iniciada (voltar: ${if (voltar) "ok" else "falhou"})")
         }
         ultimaTroca = agora
 
@@ -145,8 +147,8 @@ class BotaoVoltarService : AccessibilityService() {
     }
 
     private fun pedirGoogleWallet() {
-        val ok = Carteiras.abrirGoogleWallet(this)
-        Carteiras.registrar(this, if (ok) "pedido para abrir a Carteira do Google" else "falha ao abrir a Carteira do Google")
+        val ok = Carteiras.abrirGoogleWalletAutorizado(this)
+        Carteiras.registrar(this, if (ok) "pedido autorizado para abrir a Carteira do Google" else "falha ao abrir a Carteira do Google")
     }
 
     /**

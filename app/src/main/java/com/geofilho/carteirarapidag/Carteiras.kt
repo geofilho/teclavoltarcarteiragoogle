@@ -1,6 +1,9 @@
 package com.geofilho.carteirarapidag
 
 import android.accessibilityservice.AccessibilityServiceInfo
+import android.app.ActivityOptions
+import android.app.PendingIntent
+import android.os.Build
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -34,6 +37,37 @@ object Carteiras {
         context.packageManager.getLaunchIntentForPackage(GOOGLE_WALLET)?.apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
         }
+
+    /**
+     * Abre a Carteira do Google por um PendingIntent com a autorização explícita de abertura em
+     * segundo plano exigida pelo Android 14+ (o app tem o privilégio por ser serviço de acessibilidade,
+     * mas o Android só o usa quando o app declara isso).
+     */
+    fun abrirGoogleWalletAutorizado(context: Context): Boolean {
+        val intent = intentGoogleWallet(context) ?: return false
+        return try {
+            val modo = if (Build.VERSION.SDK_INT >= 36) {
+                ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
+            } else {
+                @Suppress("DEPRECATION")
+                ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
+            }
+            val criador = ActivityOptions.makeBasic()
+            if (Build.VERSION.SDK_INT >= 34) criador.setPendingIntentCreatorBackgroundActivityStartMode(modo)
+            val pendente = PendingIntent.getActivity(
+                context, 7, intent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                criador.toBundle(),
+            )
+            val envio = ActivityOptions.makeBasic()
+            if (Build.VERSION.SDK_INT >= 33) envio.setPendingIntentBackgroundActivityStartMode(modo)
+            pendente.send(context, 0, null, null, null, null, envio.toBundle())
+            true
+        } catch (e: Exception) {
+            registrar(context, "PendingIntent falhou: ${e.javaClass.simpleName}")
+            abrirGoogleWallet(context)
+        }
+    }
 
     fun googleWalletInstalada(context: Context): Boolean = intentGoogleWallet(context) != null
 
