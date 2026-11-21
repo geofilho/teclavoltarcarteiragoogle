@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-feature android:name="android.hardware.type.watch" />
+
+    <!-- Necessário no Android 11+ para enxergar se as carteiras estão instaladas -->
+    <queries>
+        <package android:name="com.google.android.apps.walletnfcrel" />
+        <package android:name="com.android.vending" />
+        <package android:name="com.samsung.android.samsungpay.gear" />
+        <package android:name="com.samsung.android.spay" />
+    </queries>
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/TemaG">
+
+        <meta-data
+            android:name="com.google.android.wearable.standalone"
+            android:value="true" />
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:taskAffinity="">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".ComoUsarActivity"
+            android:exported="false"
+            android:label="@string/como_usar_titulo"
+            android:taskAffinity="" />
+
+        <service
+            android:name=".BotaoVoltarService"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/servico_acessibilidade" />
+        </service>
+    </application>
+</manifest>

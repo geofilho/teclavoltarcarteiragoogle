@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tema do sistema: respeita tema escuro, alto contraste, negrito, tamanho de fonte e inversão de cores -->
+    <style name="TemaG" parent="@android:style/Theme.DeviceDefault">
+        <item name="android:buttonStyle">@style/BotaoG</item>
+        <item name="android:textAllCaps">false</item>
+    </style>
+
+    <style name="BotaoG" parent="@android:style/Widget.DeviceDefault.Button">
+        <item name="android:textAllCaps">false</item>
+        <item name="android:minHeight">52dp</item>
+        <item name="android:minWidth">48dp</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">8dp</item>
+    </style>
+
+    <style name="TituloG">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textSize">18sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">?android:attr/textColorPrimary</item>
+        <item name="android:accessibilityHeading">true</item>
+    </style>
+
+    <style name="TextoG">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:textColor">?android:attr/textColorPrimary</item>
+        <item name="android:layout_marginTop">8dp</item>
+    </style>
+</resources>

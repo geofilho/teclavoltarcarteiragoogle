@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/rolagem"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:focusable="true"
+    android:focusableInTouchMode="true"
+    android:scrollbarStyle="insideOverlay">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="28dp"
+        android:paddingEnd="28dp"
+        android:paddingTop="32dp"
+        android:paddingBottom="48dp">
+
+        <TextView
+            style="@style/TituloG"
+            android:text="@string/app_name" />
+
+        <TextView
+            android:id="@+id/status"
+            style="@style/TextoG"
+            android:gravity="center"
+            android:accessibilityLiveRegion="polite" />
+
+        <Button
+            android:id="@+id/btn_instalar"
+            style="@style/BotaoG"
+            android:text="@string/btn_instalar"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/btn_ativar"
+            style="@style/BotaoG"
+            android:text="@string/btn_ativar"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/btn_testar"
+            style="@style/BotaoG"
+            android:text="@string/btn_testar"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/btn_como_usar"
+            style="@style/BotaoG"
+            android:text="@string/btn_como_usar" />
+    </LinearLayout>
+</ScrollView>
