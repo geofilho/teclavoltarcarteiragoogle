@@ -12,8 +12,8 @@ android {
         // Wear OS 3 ou mais novo (Galaxy Watch 4 em diante, incluindo o Galaxy Watch Ultra 2)
         minSdk = 30
         targetSdk = 35
-        versionCode = 5
-        versionName = "1.4"
+        versionCode = 6
+        versionName = "1.5"
     }
 
     // Chave fixa no repositório: assim cada nova versão instala por cima da anterior
@@ -44,4 +44,9 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+}
+
+dependencies {
+    // Abre no celular a página do GitHub com o diagnóstico preenchido
+    implementation("androidx.wear:wear-remote-interactions:1.1.0")
 }

@@ -34,6 +34,21 @@ class MainActivity : Activity() {
         btnInstalar.setOnClickListener { Carteiras.abrirLojaGoogleWallet(this) }
         btnTestar.setOnClickListener { Carteiras.abrirGoogleWallet(this) }
         btnNfc.setOnClickListener { Carteiras.ligarNfcEVoltar(this) }
+        val aviso = findViewById<TextView>(R.id.aviso_diag)
+        fun avisar(texto: Int) {
+            aviso.setText(texto)
+            aviso.visibility = View.VISIBLE
+        }
+        findViewById<Button>(R.id.btn_enviar_diag).setOnClickListener {
+            avisar(R.string.diag_enviando)
+            Diagnostico.enviarPeloCelular(this) { ok ->
+                avisar(if (ok) R.string.diag_enviado else R.string.diag_falhou)
+            }
+        }
+        findViewById<Button>(R.id.btn_copiar_diag).setOnClickListener {
+            Diagnostico.copiar(this)
+            avisar(R.string.diag_copiado)
+        }
         findViewById<Button>(R.id.btn_como_usar).setOnClickListener {
             startActivity(Intent(this, ComoUsarActivity::class.java))
         }

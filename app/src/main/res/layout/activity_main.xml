@@ -52,6 +52,23 @@
             android:visibility="gone" />
 
         <Button
+            android:id="@+id/btn_enviar_diag"
+            style="@style/BotaoG"
+            android:text="@string/btn_enviar_diag" />
+
+        <Button
+            android:id="@+id/btn_copiar_diag"
+            style="@style/BotaoG"
+            android:text="@string/btn_copiar_diag" />
+
+        <TextView
+            android:id="@+id/aviso_diag"
+            style="@style/TextoG"
+            android:gravity="center"
+            android:accessibilityLiveRegion="assertive"
+            android:visibility="gone" />
+
+        <Button
             android:id="@+id/btn_como_usar"
             style="@style/BotaoG"
             android:text="@string/btn_como_usar" />

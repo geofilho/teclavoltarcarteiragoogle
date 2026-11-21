@@ -125,6 +125,8 @@ class BotaoVoltarService : AccessibilityService() {
         /** Telas que aparecem por cima da Carteira do Google sem que a pessoa tenha saído dela. */
         val PACOTES_IGNORADOS = setOf(
             "com.android.systemui",
+            "com.samsung.android.wearable.sysui",
+            "com.google.android.apps.wearable.systemui",
             "android",
             "com.google.android.gms",
             "com.google.android.inputmethod.latin",

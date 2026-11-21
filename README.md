@@ -23,7 +23,7 @@ Nenhum app comum consegue ligar o NFC, porque o Android só permite isso aos app
 
 ### Diagnóstico
 
-A tela "Como usar" mostra os últimos apps que abriram. Se a troca não funcionar, essa lista mostra o nome do pacote da Samsung Wallet no relógio, para adicionar em `Carteiras.kt`.
+O botão **Enviar diagnóstico** abre no celular a página do GitHub com um relatório já preenchido: versão, relógio, permissão, NFC, apps de carteira instalados e últimos apps que abriram. Basta tocar em criar. O botão **Copiar diagnóstico** copia o mesmo relatório. A tela "Como usar" também mostra os últimos apps que abriram. Se a troca não funcionar, essa lista mostra o nome do pacote da Samsung Wallet no relógio, para adicionar em `Carteiras.kt`.
 
 O app não lê a tela, não usa internet, não bloqueia nenhum botão e não envia dados.
 

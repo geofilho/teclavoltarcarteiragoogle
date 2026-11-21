@@ -9,6 +9,11 @@
         <package android:name="com.android.vending" />
         <package android:name="com.samsung.android.samsungpay.gear" />
         <package android:name="com.samsung.android.spay" />
+        <!-- Para o diagnóstico listar os apps de carteira instalados -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
     </queries>
 
     <application
