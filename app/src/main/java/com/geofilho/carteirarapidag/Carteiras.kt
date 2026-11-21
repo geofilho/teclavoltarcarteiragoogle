@@ -82,6 +82,20 @@ object Carteiras {
         return System.currentTimeMillis() - desde < ESPERA_NFC_MS
     }
 
+    private const val CHAVE_SESSAO_NFC = "nfc_ligado_pelo_app"
+
+    /**
+     * Marca que o NFC foi ligado por causa do app (ele estava desligado antes).
+     * Só nesse caso, ao sair da Carteira do Google, o app oferece desligar o NFC de novo.
+     */
+    fun marcarNfcLigadoPeloApp(context: Context, ligado: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean(CHAVE_SESSAO_NFC, ligado).apply()
+    }
+
+    fun nfcLigadoPeloApp(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(CHAVE_SESSAO_NFC, false)
+
     /** Abre a chave do NFC e, quando ele for ligado, a Carteira do Google abre sozinha. */
     fun ligarNfcEVoltar(context: Context) {
         marcarEsperaNfc(context)

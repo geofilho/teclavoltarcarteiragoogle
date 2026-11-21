@@ -44,7 +44,10 @@ class MainActivity : Activity() {
         // Se voltou para cá depois de ligar o NFC (caso o serviço não tenha aberto antes), segue para a Carteira
         if (!Carteiras.nfcDesligado(this) && Carteiras.consumirEsperaNfc(this) &&
             Carteiras.abrirGoogleWallet(this)
-        ) return
+        ) {
+            Carteiras.marcarNfcLigadoPeloApp(this, true)
+            return
+        }
         atualizar()
         // Permite rolar a tela girando a moldura do relógio
         rolagem.requestFocus()
