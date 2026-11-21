@@ -395,12 +395,11 @@ class BotaoVoltarService : AccessibilityService() {
 
     private companion object {
         /**
-         * Teste (versão 1.13): não fecha a Samsung Wallet. Ela fica aberta por baixo, mantendo o
-         * NFC ligado, e a Carteira do Google fica na frente. Ao sair da Carteira do Google, a
-         * Samsung Wallet reaparece e o app volta ao mostrador (o que a fecha e desliga o NFC).
-         * Para voltar ao jeito anterior (chave do NFC), basta trocar para false.
+         * Testado na 1.13 e descartado (issue #7): com a Samsung Wallet aberta por baixo, a janela
+         * dela impede a Carteira do Google de vir para a frente, e ela desliga o NFC assim que
+         * sai da frente. Por isso a Samsung Wallet é fechada e o NFC é tratado pela chave do NFC.
          */
-        const val MANTER_SAMSUNG_POR_BAIXO = true
+        const val MANTER_SAMSUNG_POR_BAIXO = false
         const val EVENTO_ATRASADO_MS = 2_500L
 
         const val TAG_ABRINDO = "abrindo"

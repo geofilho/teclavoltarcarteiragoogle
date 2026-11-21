@@ -17,8 +17,9 @@ Não precisa da permissão de sobreposição de tela. O Android 14+ (o relógio 
 
 Nenhum app comum consegue ligar o NFC, porque o Android só permite isso aos apps do sistema.
 
-- A Samsung Wallet liga o NFC sozinha ao abrir e desliga ao fechar.
-- **Versão de teste 1.13:** o app não fecha a Samsung Wallet. Ela fica aberta por baixo, mantendo o NFC ligado, e a Carteira do Google fica na frente. Ao sair da Carteira do Google, a Samsung Wallet reaparece, o app volta ao mostrador e o NFC desliga sozinho. O registro mostra o estado do NFC 1,5 s, 5 s e 15 s depois da troca. Para voltar ao jeito anterior, troque `MANTER_SAMSUNG_POR_BAIXO` para `false` em `BotaoVoltarService.kt`. Nesse jeito anterior, o app espera o NFC parar de mudar e, se o NFC estiver desligado, abre direto a chave do NFC.
+- A Samsung Wallet liga o NFC sozinha ao abrir e desliga assim que sai da frente.
+- O app fecha a Samsung Wallet, cobre a tela e espera o NFC parar de mudar (de 0,9 a 3 s) antes de decidir.
+- Deixar a Samsung Wallet aberta por baixo, para aproveitar o NFC que ela liga, foi testado na versão 1.13 e não funciona. A janela dela impede a Carteira do Google de vir para a frente, e ela desliga o NFC assim que sai da frente (issue #7).
 - Se o NFC estiver desligado, a chave do NFC abre direto, sem pergunta. Ao ligar, a Carteira do Google abre sozinha.
 - Ao sair da Carteira do Google, a chave do NFC abre direto, sem pergunta. Ao desligar, o app volta para o mostrador.
 - Se o NFC já estava ligado, nada disso aparece. Ao sair da Carteira do Google, se a Samsung Wallet reaparecer por baixo, o app volta para o mostrador em vez de abrir a Carteira do Google de novo.
