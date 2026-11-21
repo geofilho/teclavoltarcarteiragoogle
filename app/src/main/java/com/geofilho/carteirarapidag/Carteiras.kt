@@ -83,6 +83,36 @@ object Carteiras {
     }
 
     private const val CHAVE_SESSAO_NFC = "nfc_ligado_pelo_app"
+    private const val CHAVE_ESPERANDO_DESLIGAR = "esperando_desligar_desde"
+    private const val CHAVE_APPS_DETECTADOS = "apps_detectados"
+
+    /** Lembra que, assim que o NFC for desligado, o app deve voltar para o mostrador. */
+    fun marcarEsperaDesligar(context: Context) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putLong(CHAVE_ESPERANDO_DESLIGAR, System.currentTimeMillis()).apply()
+    }
+
+    fun consumirEsperaDesligar(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val desde = prefs.getLong(CHAVE_ESPERANDO_DESLIGAR, 0L)
+        if (desde == 0L) return false
+        prefs.edit().remove(CHAVE_ESPERANDO_DESLIGAR).apply()
+        return System.currentTimeMillis() - desde < ESPERA_NFC_MS
+    }
+
+    /** Guarda os últimos apps que apareceram na tela, para diagnóstico na tela Como usar. */
+    fun registrarAppDetectado(context: Context, pacote: String) {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val lista = appsDetectados(context)
+        if (lista.firstOrNull() == pacote) return
+        val nova = (listOf(pacote) + lista.filter { it != pacote }).take(6)
+        prefs.edit().putString(CHAVE_APPS_DETECTADOS, nova.joinToString("\n")).apply()
+    }
+
+    fun appsDetectados(context: Context): List<String> =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(CHAVE_APPS_DETECTADOS, "")!!
+            .split("\n").filter { it.isNotBlank() }
 
     /**
      * Marca que o NFC foi ligado por causa do app (ele estava desligado antes).

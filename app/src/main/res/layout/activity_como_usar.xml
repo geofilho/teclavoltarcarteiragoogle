@@ -24,6 +24,15 @@
             style="@style/TextoG"
             android:text="@string/como_usar_texto" />
 
+        <TextView
+            style="@style/TituloG"
+            android:layout_marginTop="16dp"
+            android:text="@string/diagnostico_titulo" />
+
+        <TextView
+            android:id="@+id/diagnostico"
+            style="@style/TextoG" />
+
         <Button
             android:id="@+id/btn_voltar"
             style="@style/BotaoG"

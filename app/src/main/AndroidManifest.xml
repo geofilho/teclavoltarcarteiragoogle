@@ -39,6 +39,12 @@
             android:label="@string/como_usar_titulo"
             android:taskAffinity="" />
 
+        <activity
+            android:name=".ConfirmaNfcActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity="" />
+
         <service
             android:name=".BotaoVoltarService"
             android:exported="false"

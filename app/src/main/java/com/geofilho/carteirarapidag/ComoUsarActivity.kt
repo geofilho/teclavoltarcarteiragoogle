@@ -4,6 +4,7 @@ import android.app.Activity
 import android.os.Bundle
 import android.widget.Button
 import android.widget.ScrollView
+import android.widget.TextView
 
 class ComoUsarActivity : Activity() {
 
@@ -15,6 +16,10 @@ class ComoUsarActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        val apps = Carteiras.appsDetectados(this)
+        findViewById<TextView>(R.id.diagnostico).text =
+            if (apps.isEmpty()) getString(R.string.diagnostico_vazio)
+            else getString(R.string.diagnostico_lista, apps.joinToString("\n"))
         findViewById<ScrollView>(R.id.rolagem).requestFocus()
     }
 }

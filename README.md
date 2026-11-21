@@ -7,19 +7,25 @@ App para Wear OS (feito para o Galaxy Watch Ultra 2, funciona do Galaxy Watch 4 
 A Samsung não deixa nenhum app mudar a função de segurar o botão Voltar. Por isso o app usa um serviço de acessibilidade:
 
 1. Você segura o botão Voltar e a Samsung Wallet começa a abrir.
-2. O serviço percebe isso e abre a Carteira do Google por cima, na hora.
+2. O serviço manda a Samsung Wallet para trás e abre a Carteira do Google no lugar.
 
-Pode aparecer um piscar rápido da Samsung Wallet antes da troca.
+Pode aparecer um piscar rápido antes da troca. A Samsung Wallet também é trocada quando aberta pela lista de apps. Para usar a Samsung Wallet, desligue o serviço. Se a Carteira do Google não estiver instalada, o app não interfere e avisa na tela.
 
-- Se o relógio avisar o serviço sobre o botão Voltar, só o atalho do botão é trocado: abrir a Samsung Wallet pela lista de apps continua normal.
-- Se o relógio não avisar (a Samsung pode reservar o botão), a Carteira do Google abre sempre que a Samsung Wallet abrir.
-- Se a Carteira do Google não estiver instalada, o app não interfere e avisa na tela.
+Não precisa da permissão de sobreposição de tela: o serviço de acessibilidade já pode abrir apps por cima.
 
-Sobre o NFC: nenhum app comum consegue ligar o NFC, porque o Android só permite isso aos apps do sistema. Se o NFC estiver desligado quando você segurar o botão Voltar, o app abre direto a chave do NFC. Quando você liga, a Carteira do Google abre sozinha logo em seguida. Ao sair da Carteira do Google, a chave do NFC aparece de novo. Se você desligar, o app fecha tudo e volta para o mostrador. Se sair sem desligar, o NFC fica ligado e o app não insiste.
+### NFC
 
-Isso só acontece quando o NFC estava desligado. Se ele já estava ligado, a chave não aparece nem para ligar nem para desligar. O botão **Ligar NFC**, na tela do app, também só aparece com o NFC desligado.
+Nenhum app comum consegue ligar o NFC, porque o Android só permite isso aos apps do sistema.
 
-O app não lê a tela, não usa internet, não bloqueia nenhum botão e não guarda dados.
+- Se o NFC estiver desligado, aparece só a pergunta **Ativar NFC?**. Com **Sim**, abre a chave do NFC; ao ligar, a Carteira do Google abre sozinha. Com **Não**, a Carteira do Google abre mesmo assim.
+- Ao sair da Carteira do Google, aparece **Desativar NFC?**. Com **Sim** e a chave desligada, o app volta para o mostrador.
+- Se o NFC já estava ligado, nenhuma pergunta aparece.
+
+### Diagnóstico
+
+A tela "Como usar" mostra os últimos apps que abriram. Se a troca não funcionar, essa lista mostra o nome do pacote da Samsung Wallet no relógio, para adicionar em `Carteiras.kt`.
+
+O app não lê a tela, não usa internet, não bloqueia nenhum botão e não envia dados.
 
 ## Baixar
 

@@ -10,39 +10,24 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
-import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
 
 /**
- * Quando a Samsung Wallet abre por causa do botão Voltar pressionado,
- * abre a Carteira do Google por cima dela.
- *
- * Botão Voltar:
- * - Se o relógio entrega ao serviço os toques no botão Voltar, só redireciona quando a
- *   Samsung Wallet abre logo depois de o botão ser pressionado.
- * - Se o relógio não entrega esses toques, redireciona sempre que a Samsung Wallet abrir.
+ * Sempre que a Samsung Wallet abre (botão Voltar pressionado), troca pela Carteira do Google.
  *
  * NFC (só quando ele estava desligado):
- * 1. Abre a chave do NFC. Ao ligar, a Carteira do Google abre sozinha.
- * 2. Ao sair da Carteira do Google, abre a chave do NFC de novo.
+ * 1. Pergunta "Ativar NFC?". Ao ligar, a Carteira do Google abre sozinha.
+ * 2. Ao sair da Carteira do Google, pergunta "Desativar NFC?".
  * 3. Ao desligar, volta para o mostrador do relógio.
- * Se o NFC já estava ligado, nada disso acontece.
+ * Se o NFC já estava ligado, nada disso aparece.
  */
 class BotaoVoltarService : AccessibilityService() {
 
     private val handler = Handler(Looper.getMainLooper())
-
-    private var ultimoVoltar = 0L
-    private var recebeBotao = false
-    private var ultimaAbertura = 0L
+    private var ultimaTroca = 0L
 
     /** A Carteira do Google já apareceu na tela depois que o app ligou o NFC. */
     private var viuGoogleWallet = false
-
-    /** Estamos mostrando a chave do NFC para a pessoa desligar. */
-    private var aguardandoDesligar = false
-    private var aguardandoDesde = 0L
-    private var pacoteAjustes: String? = null
 
     private val receptorNfc = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -53,9 +38,8 @@ class BotaoVoltarService : AccessibilityService() {
                     handler.postDelayed({ Carteiras.abrirGoogleWallet(context) }, ATRASO_NFC_MS)
                 }
                 NfcAdapter.STATE_OFF -> {
-                    val fechar = aguardandoDesligar
-                    encerrarSessaoNfc()
-                    if (fechar) {
+                    Carteiras.marcarNfcLigadoPeloApp(context, false)
+                    if (Carteiras.consumirEsperaDesligar(context)) {
                         // Fecha tudo: volta para o mostrador do relógio
                         handler.postDelayed({ performGlobalAction(GLOBAL_ACTION_HOME) }, ATRASO_NFC_MS)
                     }
@@ -74,84 +58,51 @@ class BotaoVoltarService : AccessibilityService() {
         }
     }
 
-    override fun onKeyEvent(event: KeyEvent): Boolean {
-        if (event.keyCode == KeyEvent.KEYCODE_BACK &&
-            event.action == KeyEvent.ACTION_DOWN &&
-            event.repeatCount == 0
-        ) {
-            recebeBotao = true
-            ultimoVoltar = SystemClock.uptimeMillis()
-        }
-        // Nunca bloqueia o botão: Voltar continua funcionando normalmente.
-        return false
-    }
-
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null || event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val pacote = event.packageName?.toString() ?: return
+        if (pacote != packageName) Carteiras.registrarAppDetectado(this, pacote)
 
         if (Carteiras.ehSamsungWallet(pacote)) {
-            redirecionarSamsungWallet()
+            trocarSamsungWallet()
             return
         }
-        acompanharSessaoNfc(pacote)
+        acompanharSaidaDaCarteira(pacote)
     }
 
-    private fun redirecionarSamsungWallet() {
+    private fun trocarSamsungWallet() {
         val agora = SystemClock.uptimeMillis()
-        val veioDoBotao = !recebeBotao || agora - ultimoVoltar < JANELA_BOTAO_MS
-        if (!veioDoBotao) return
-        if (agora - ultimaAbertura < INTERVALO_MINIMO_MS) return
+        if (agora - ultimaTroca < INTERVALO_MINIMO_MS) return
         if (!Carteiras.googleWalletInstalada(this)) return // sem ela, deixa a Samsung Wallet abrir
+        ultimaTroca = agora
 
-        ultimaAbertura = agora
+        // Manda a Samsung Wallet para trás; assim, ao sair da Carteira do Google, ela não reaparece
+        performGlobalAction(GLOBAL_ACTION_HOME)
         handler.postDelayed({
             if (Carteiras.nfcDesligado(this)) {
-                // NFC desligado: abre a chave do NFC; ao ligar, a Carteira do Google abre sozinha
-                Carteiras.ligarNfcEVoltar(this)
+                ConfirmaNfcActivity.abrir(this, ConfirmaNfcActivity.MODO_LIGAR)
             } else {
                 Carteiras.abrirGoogleWallet(this)
             }
-        }, ATRASO_MS)
+        }, ATRASO_TROCA_MS)
     }
 
     /** Só age quando foi o app que ligou o NFC. */
-    private fun acompanharSessaoNfc(pacote: String) {
+    private fun acompanharSaidaDaCarteira(pacote: String) {
+        if (!Carteiras.nfcLigadoPeloApp(this)) return
         if (pacote == Carteiras.GOOGLE_WALLET) {
-            if (Carteiras.nfcLigadoPeloApp(this)) viuGoogleWallet = true
+            viuGoogleWallet = true
             return
         }
         if (pacote in PACOTES_IGNORADOS || pacote == packageName) return
+        if (!viuGoogleWallet || Carteiras.nfcDesligado(this)) return
 
-        if (aguardandoDesligar) {
-            val agora = SystemClock.uptimeMillis()
-            if (agora - aguardandoDesde > ESPERA_DESLIGAR_MS) {
-                encerrarSessaoNfc()
-                return
-            }
-            if (pacoteAjustes == null) {
-                pacoteAjustes = pacote // a primeira tela que aparece é a dos ajustes do NFC
-            } else if (pacote != pacoteAjustes) {
-                encerrarSessaoNfc() // saiu sem desligar: não insiste
-            }
-            return
-        }
-
-        if (Carteiras.nfcLigadoPeloApp(this) && viuGoogleWallet && !Carteiras.nfcDesligado(this)) {
-            // Saiu da Carteira do Google: oferece desligar o NFC de novo
-            aguardandoDesligar = true
-            aguardandoDesde = SystemClock.uptimeMillis()
-            pacoteAjustes = null
-            viuGoogleWallet = false
-            handler.postDelayed({ Carteiras.abrirAjustesNfc(this) }, ATRASO_MS)
-        }
-    }
-
-    private fun encerrarSessaoNfc() {
-        Carteiras.marcarNfcLigadoPeloApp(this, false)
-        aguardandoDesligar = false
-        pacoteAjustes = null
+        // Saiu da Carteira do Google: pergunta uma única vez se quer desligar o NFC
         viuGoogleWallet = false
+        Carteiras.marcarNfcLigadoPeloApp(this, false)
+        handler.postDelayed({
+            ConfirmaNfcActivity.abrir(this, ConfirmaNfcActivity.MODO_DESLIGAR)
+        }, ATRASO_TROCA_MS)
     }
 
     override fun onInterrupt() = Unit
@@ -167,11 +118,9 @@ class BotaoVoltarService : AccessibilityService() {
     }
 
     private companion object {
-        const val JANELA_BOTAO_MS = 4_000L
         const val INTERVALO_MINIMO_MS = 2_000L
-        const val ATRASO_MS = 120L
+        const val ATRASO_TROCA_MS = 250L
         const val ATRASO_NFC_MS = 400L
-        const val ESPERA_DESLIGAR_MS = 2 * 60 * 1000L
 
         /** Telas que aparecem por cima da Carteira do Google sem que a pessoa tenha saído dela. */
         val PACOTES_IGNORADOS = setOf(
