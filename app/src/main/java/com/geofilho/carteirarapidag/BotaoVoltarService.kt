@@ -5,46 +5,61 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.PixelFormat
 import android.nfc.NfcAdapter
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.view.ContextThemeWrapper
+import android.view.LayoutInflater
+import android.view.View
+import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
+import android.widget.Button
+import android.widget.TextView
 
 /**
  * Sempre que a Samsung Wallet abre (botão Voltar pressionado), troca pela Carteira do Google.
  *
+ * O Android 14+ bloqueia apps que abrem telas estando em segundo plano. Por isso o serviço
+ * primeiro desenha uma camada própria por cima da Samsung Wallet (camada de acessibilidade,
+ * não precisa de permissão extra) e, com ela visível, abre a Carteira do Google.
+ *
  * NFC (só quando ele estava desligado):
- * 1. Pergunta "Ativar NFC?". Ao ligar, a Carteira do Google abre sozinha.
- * 2. Ao sair da Carteira do Google, pergunta "Desativar NFC?".
+ * 1. A camada pergunta "Ativar NFC?". Ao ligar, a Carteira do Google abre sozinha.
+ * 2. Ao sair da Carteira do Google, a camada pergunta "Desativar NFC?".
  * 3. Ao desligar, volta para o mostrador do relógio.
- * Se o NFC já estava ligado, nada disso aparece.
  */
 class BotaoVoltarService : AccessibilityService() {
 
     private val handler = Handler(Looper.getMainLooper())
+    private var windowManager: WindowManager? = null
+    private var camada: View? = null
+
     private var ultimaTroca = 0L
     private var tentativas = 0
-
-    /** Último app que apareceu na frente. */
-    private var pacoteNaFrente: String? = null
 
     /** A Carteira do Google já apareceu na tela depois que o app ligou o NFC. */
     private var viuGoogleWallet = false
 
     private val receptorNfc = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            when (intent.getIntExtra(NfcAdapter.EXTRA_ADAPTER_STATE, NfcAdapter.STATE_OFF)) {
+            val estado = intent.getIntExtra(NfcAdapter.EXTRA_ADAPTER_STATE, NfcAdapter.STATE_OFF)
+            if (estado == NfcAdapter.STATE_ON || estado == NfcAdapter.STATE_OFF) {
+                Carteiras.registrar(context, "aviso do sistema: NFC ${if (estado == NfcAdapter.STATE_ON) "ligado" else "desligado"}")
+            }
+            when (estado) {
                 NfcAdapter.STATE_ON -> if (Carteiras.consumirEsperaNfc(context)) {
+                    Carteiras.registrar(context, "NFC ligado: abrindo a Carteira do Google")
                     Carteiras.marcarNfcLigadoPeloApp(context, true)
                     viuGoogleWallet = false
-                    handler.postDelayed({ Carteiras.abrirGoogleWallet(context) }, ATRASO_NFC_MS)
+                    handler.postDelayed({ abrirCarteiraComCamada() }, ATRASO_NFC_MS)
                 }
                 NfcAdapter.STATE_OFF -> {
                     Carteiras.marcarNfcLigadoPeloApp(context, false)
                     if (Carteiras.consumirEsperaDesligar(context)) {
-                        // Fecha tudo: volta para o mostrador do relógio
+                        Carteiras.registrar(context, "NFC desligado: voltando ao mostrador")
                         handler.postDelayed({ performGlobalAction(GLOBAL_ACTION_HOME) }, ATRASO_NFC_MS)
                     }
                 }
@@ -54,25 +69,33 @@ class BotaoVoltarService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         val filtro = IntentFilter(NfcAdapter.ACTION_ADAPTER_STATE_CHANGED)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(receptorNfc, filtro, Context.RECEIVER_EXPORTED)
         } else {
             registerReceiver(receptorNfc, filtro)
         }
+        Carteiras.registrar(this, "serviço iniciado")
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null || event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val pacote = event.packageName?.toString() ?: return
-        if (pacote != packageName) Carteiras.registrarAppDetectado(this, pacote)
-        pacoteNaFrente = pacote
-        if (Carteiras.ehSamsungWallet(pacote) || pacote == Carteiras.GOOGLE_WALLET) {
-            Carteiras.registrar(this, "abriu $pacote / ${event.className}")
-        }
+        if (pacote == packageName) return // nossas próprias telas e camada
+        Carteiras.registrarAppDetectado(this, pacote)
 
         if (Carteiras.ehSamsungWallet(pacote)) {
+            Carteiras.registrar(this, "abriu Samsung Wallet / ${event.className}")
             trocarSamsungWallet()
+            return
+        }
+        if (pacote == Carteiras.GOOGLE_WALLET) {
+            if (camada?.tag == TAG_ABRINDO) {
+                Carteiras.registrar(this, "Carteira do Google na frente: tirando a camada")
+                removerCamada()
+            }
+            if (Carteiras.nfcLigadoPeloApp(this)) viuGoogleWallet = true
             return
         }
         acompanharSaidaDaCarteira(pacote)
@@ -83,70 +106,142 @@ class BotaoVoltarService : AccessibilityService() {
             Carteiras.registrar(this, "Carteira do Google não instalada: nada feito")
             return
         }
+        if (camada != null) return // a camada já está cobrindo a Samsung Wallet
+
         val agora = SystemClock.uptimeMillis()
-        val reabriu = agora - ultimaTroca < JANELA_INSISTIR_MS
-        if (reabriu) {
-            // A Samsung Wallet voltou logo depois da troca: insiste, até um limite
+        val desde = agora - ultimaTroca
+        if (desde < MESMA_ABERTURA_MS) return // vários eventos da mesma abertura
+        if (desde < JANELA_INSISTIR_MS) {
             if (tentativas >= MAX_TENTATIVAS) {
                 Carteiras.registrar(this, "limite de tentativas atingido")
                 return
             }
             tentativas++
-            Carteiras.registrar(this, "Samsung Wallet voltou: abrindo a Carteira do Google de novo ($tentativas)")
-            handler.postDelayed({ abrirDestino() }, ATRASO_TROCA_MS)
-            return
+            Carteiras.registrar(this, "Samsung Wallet voltou: tentativa $tentativas")
+        } else {
+            tentativas = 0
+            val home = performGlobalAction(GLOBAL_ACTION_HOME)
+            Carteiras.registrar(this, "troca iniciada (mostrador: ${if (home) "ok" else "falhou"})")
         }
         ultimaTroca = agora
-        tentativas = 0
-        Carteiras.registrar(this, "troca: mostrador + Carteira do Google")
 
-        // Manda a Samsung Wallet para trás; assim, ao sair da Carteira do Google, ela não reaparece
-        performGlobalAction(GLOBAL_ACTION_HOME)
-        handler.postDelayed({ abrirDestino() }, ATRASO_TROCA_MS)
-        // Confere depois de um tempo se a Samsung Wallet não ficou por cima
-        handler.postDelayed({ conferir() }, CONFERIR_MS)
-        handler.postDelayed({ conferir() }, CONFERIR_MS * 2)
+        if (Carteiras.nfcDesligado(this)) mostrarPerguntaLigar() else abrirCarteiraComCamada()
     }
 
-    private fun abrirDestino() {
-        if (Carteiras.nfcDesligado(this)) {
-            ConfirmaNfcActivity.abrir(this, ConfirmaNfcActivity.MODO_LIGAR)
-        } else {
-            val ok = Carteiras.abrirGoogleWallet(this)
-            if (!ok) Carteiras.registrar(this, "falha ao abrir a Carteira do Google")
+    /** Cobre a tela, abre a Carteira do Google e tira a camada quando ela aparecer. */
+    private fun abrirCarteiraComCamada() {
+        val view = inflar(R.layout.camada_abrindo)
+        if (view != null) {
+            view.tag = TAG_ABRINDO
+            if (!mostrarCamada(view)) Carteiras.registrar(this, "sem camada; abrindo direto")
         }
+        handler.postDelayed({
+            val ok = Carteiras.abrirGoogleWallet(this)
+            Carteiras.registrar(this, if (ok) "pedido para abrir a Carteira do Google" else "falha ao abrir a Carteira do Google")
+        }, ATRASO_ABRIR_MS)
+        // Se a Carteira do Google não aparecer, não deixa a camada presa na tela
+        handler.postDelayed({
+            if (camada?.tag == TAG_ABRINDO) {
+                Carteiras.registrar(this, "Carteira do Google não apareceu em $LIMITE_CAMADA_MS ms")
+                removerCamada()
+            }
+        }, LIMITE_CAMADA_MS)
     }
 
-    private fun conferir() {
-        if (Carteiras.ehSamsungWallet(pacoteNaFrente) && tentativas < MAX_TENTATIVAS) {
-            tentativas++
-            Carteiras.registrar(this, "Samsung Wallet ainda na frente: abrindo de novo ($tentativas)")
-            abrirDestino()
+    private fun mostrarPerguntaLigar() {
+        mostrarPergunta(R.string.pergunta_ativar_nfc, sim = {
+            Carteiras.registrar(this, "Ativar NFC? sim")
+            Carteiras.marcarEsperaNfc(this)
+            Carteiras.abrirAjustesNfc(this)
+            handler.postDelayed({ removerCamada() }, ATRASO_TIRAR_MS)
+        }, nao = {
+            Carteiras.registrar(this, "Ativar NFC? não")
+            removerCamada()
+            abrirCarteiraComCamada()
+        })
+        Carteiras.registrar(this, "mostrou Ativar NFC?")
+    }
+
+    private fun mostrarPerguntaDesligar() {
+        mostrarPergunta(R.string.pergunta_desativar_nfc, sim = {
+            Carteiras.registrar(this, "Desativar NFC? sim")
+            Carteiras.marcarEsperaDesligar(this)
+            Carteiras.abrirAjustesNfc(this)
+            handler.postDelayed({ removerCamada() }, ATRASO_TIRAR_MS)
+        }, nao = {
+            Carteiras.registrar(this, "Desativar NFC? não")
+            removerCamada()
+        })
+        Carteiras.registrar(this, "mostrou Desativar NFC?")
+    }
+
+    private fun mostrarPergunta(texto: Int, sim: () -> Unit, nao: () -> Unit) {
+        val view = inflar(R.layout.camada_pergunta) ?: return
+        view.tag = TAG_PERGUNTA
+        val pergunta = view.findViewById<TextView>(R.id.pergunta)
+        pergunta.setText(texto)
+        view.findViewById<Button>(R.id.btn_sim).setOnClickListener { sim() }
+        view.findViewById<Button>(R.id.btn_nao).setOnClickListener { nao() }
+        if (mostrarCamada(view)) {
+            // Leitor de tela anuncia a pergunta assim que ela aparece
+            pergunta.post { pergunta.sendAccessibilityEvent(AccessibilityEvent.TYPE_VIEW_FOCUSED) }
         }
     }
 
     /** Só age quando foi o app que ligou o NFC. */
     private fun acompanharSaidaDaCarteira(pacote: String) {
         if (!Carteiras.nfcLigadoPeloApp(this)) return
-        if (pacote == Carteiras.GOOGLE_WALLET) {
-            viuGoogleWallet = true
-            return
-        }
-        if (pacote in PACOTES_IGNORADOS || pacote == packageName) return
+        if (pacote in PACOTES_IGNORADOS) return
         if (!viuGoogleWallet || Carteiras.nfcDesligado(this)) return
 
         // Saiu da Carteira do Google: pergunta uma única vez se quer desligar o NFC
         viuGoogleWallet = false
         Carteiras.marcarNfcLigadoPeloApp(this, false)
-        handler.postDelayed({
-            ConfirmaNfcActivity.abrir(this, ConfirmaNfcActivity.MODO_DESLIGAR)
-        }, ATRASO_TROCA_MS)
+        Carteiras.registrar(this, "saiu da Carteira do Google para $pacote")
+        handler.postDelayed({ mostrarPerguntaDesligar() }, ATRASO_TIRAR_MS)
+    }
+
+    private fun inflar(layout: Int): View? = try {
+        LayoutInflater.from(ContextThemeWrapper(this, R.style.TemaG)).inflate(layout, null)
+    } catch (e: Exception) {
+        Carteiras.registrar(this, "erro ao montar a camada: ${e.javaClass.simpleName}")
+        null
+    }
+
+    private fun mostrarCamada(view: View): Boolean {
+        removerCamada()
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.OPAQUE,
+        )
+        return try {
+            windowManager?.addView(view, params)
+            camada = view
+            true
+        } catch (e: Exception) {
+            Carteiras.registrar(this, "erro ao mostrar a camada: ${e.javaClass.simpleName}")
+            false
+        }
+    }
+
+    private fun removerCamada() {
+        val v = camada ?: return
+        camada = null
+        try {
+            windowManager?.removeView(v)
+        } catch (e: Exception) {
+            // já removida
+        }
     }
 
     override fun onInterrupt() = Unit
 
     override fun onDestroy() {
         handler.removeCallbacksAndMessages(null)
+        removerCamada()
         try {
             unregisterReceiver(receptorNfc)
         } catch (e: Exception) {
@@ -156,11 +251,16 @@ class BotaoVoltarService : AccessibilityService() {
     }
 
     private companion object {
-        const val JANELA_INSISTIR_MS = 5_000L
+        const val TAG_ABRINDO = "abrindo"
+        const val TAG_PERGUNTA = "pergunta"
+
+        const val MESMA_ABERTURA_MS = 1_200L
+        const val JANELA_INSISTIR_MS = 6_000L
         const val MAX_TENTATIVAS = 3
-        const val CONFERIR_MS = 900L
-        const val ATRASO_TROCA_MS = 250L
+        const val ATRASO_ABRIR_MS = 150L
+        const val ATRASO_TIRAR_MS = 600L
         const val ATRASO_NFC_MS = 400L
+        const val LIMITE_CAMADA_MS = 4_000L
 
         /** Telas que aparecem por cima da Carteira do Google sem que a pessoa tenha saído dela. */
         val PACOTES_IGNORADOS = setOf(
