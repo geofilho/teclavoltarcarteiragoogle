@@ -12,8 +12,8 @@ android {
         // Wear OS 3 ou mais novo (Galaxy Watch 4 em diante, incluindo o Galaxy Watch Ultra 2)
         minSdk = 30
         targetSdk = 35
-        versionCode = 13
-        versionName = "1.12"
+        versionCode = 14
+        versionName = "1.13-teste"
     }
 
     // Chave fixa no repositório: assim cada nova versão instala por cima da anterior

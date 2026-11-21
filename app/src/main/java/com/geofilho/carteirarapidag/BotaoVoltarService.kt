@@ -40,6 +40,9 @@ class BotaoVoltarService : AccessibilityService() {
 
     private var ultimaTroca = 0L
 
+    /** Momento em que a Carteira do Google foi confirmada na frente. */
+    private var confirmadaEm = 0L
+
     /** Momento da última mudança do NFC (a Samsung Wallet liga e desliga o NFC sozinha). */
     private var ultimaMudancaNfc = 0L
     private var tentativas = 0
@@ -100,8 +103,12 @@ class BotaoVoltarService : AccessibilityService() {
 
         if (Carteiras.ehSamsungWallet(pacote)) {
             Carteiras.registrar(this, "abriu Samsung Wallet / ${event.className}")
+            val agoraEv = SystemClock.uptimeMillis()
+            if (camada == null && agoraEv - confirmadaEm < EVENTO_ATRASADO_MS) {
+                return // evento atrasado da mesma abertura, logo depois da troca
+            }
             val saindoDaCarteira = anterior == Carteiras.GOOGLE_WALLET && camada == null &&
-                SystemClock.uptimeMillis() - ultimaTroca > MESMA_ABERTURA_MS
+                agoraEv - ultimaTroca > MESMA_ABERTURA_MS
             if (saindoDaCarteira) {
                 // A Samsung Wallet só reapareceu porque a pessoa saiu da Carteira do Google
                 saiuDaCarteira(pacote)
@@ -140,12 +147,23 @@ class BotaoVoltarService : AccessibilityService() {
             Carteiras.registrar(this, "Samsung Wallet voltou: tentativa $tentativas")
         } else {
             tentativas = 0
-            // "Voltar" fecha a Samsung Wallet. Não usa "mostrador": apertar o início faz o Android
-            // bloquear por alguns segundos a abertura de outros apps.
-            val voltar = performGlobalAction(GLOBAL_ACTION_BACK)
-            Carteiras.registrar(this, "troca iniciada (voltar: ${if (voltar) "ok" else "falhou"})")
+            if (MANTER_SAMSUNG_POR_BAIXO) {
+                Carteiras.registrar(this, "troca iniciada (Samsung Wallet fica por baixo; NFC ${estadoNfc()})")
+            } else {
+                // "Voltar" fecha a Samsung Wallet. Não usa "mostrador": apertar o início faz o Android
+                // bloquear por alguns segundos a abertura de outros apps.
+                val voltar = performGlobalAction(GLOBAL_ACTION_BACK)
+                Carteiras.registrar(this, "troca iniciada (voltar: ${if (voltar) "ok" else "falhou"})")
+            }
         }
         ultimaTroca = agora
+
+        if (MANTER_SAMSUNG_POR_BAIXO) {
+            // A Samsung Wallet continua aberta por baixo e mantém o NFC ligado; só a Carteira do
+            // Google vem para a frente. Nada de chave do NFC.
+            abrirCarteiraComCamada()
+            return
+        }
 
         // A Samsung Wallet liga o NFC ao abrir e desliga ao fechar. Cobre a tela e espera o NFC
         // parar de mudar antes de decidir entre abrir a Carteira do Google ou a chave do NFC.
@@ -214,10 +232,14 @@ class BotaoVoltarService : AccessibilityService() {
         Carteiras.registrar(this, "verificação $etapa: topo=$topo; janelas=${descreverJanelas()}")
         if (topo == Carteiras.GOOGLE_WALLET) {
             removerCamada()
-            // Confere mais uma vez, só para o registro, se ela continuou na frente
-            handler.postDelayed({
-                Carteiras.registrar(this, "1,5 s depois: topo=${pacoteDoTopo()}")
-            }, 1_500L)
+            confirmadaEm = SystemClock.uptimeMillis()
+            Carteiras.registrar(this, "Carteira do Google na frente; NFC ${estadoNfc()}")
+            // Amostras para o registro: a Carteira continua na frente? O NFC continua ligado?
+            for (ms in listOf(1_500L, 5_000L, 15_000L)) {
+                handler.postDelayed({
+                    Carteiras.registrar(this, "${ms / 1000.0} s depois: topo=${pacoteDoTopo()}; NFC ${estadoNfc()}")
+                }, ms)
+            }
             return
         }
         if (topo == null && esperas < MAX_ESPERAS) {
@@ -310,7 +332,16 @@ class BotaoVoltarService : AccessibilityService() {
         if (Carteiras.ehSamsungWallet(destino)) {
             Carteiras.registrar(this, "saiu da Carteira do Google e a Samsung Wallet reapareceu: voltando ao mostrador")
             performGlobalAction(GLOBAL_ACTION_HOME)
+            handler.postDelayed({
+                Carteiras.registrar(this, "2 s depois de voltar ao mostrador: NFC ${estadoNfc()}")
+            }, 2_000L)
         }
+    }
+
+    private fun estadoNfc(): String = when {
+        NfcAdapter.getDefaultAdapter(this) == null -> "inexistente"
+        Carteiras.nfcDesligado(this) -> "desligado"
+        else -> "ligado"
     }
 
     private fun inflar(layout: Int): View? = try {
@@ -363,6 +394,15 @@ class BotaoVoltarService : AccessibilityService() {
     }
 
     private companion object {
+        /**
+         * Teste (versão 1.13): não fecha a Samsung Wallet. Ela fica aberta por baixo, mantendo o
+         * NFC ligado, e a Carteira do Google fica na frente. Ao sair da Carteira do Google, a
+         * Samsung Wallet reaparece e o app volta ao mostrador (o que a fecha e desliga o NFC).
+         * Para voltar ao jeito anterior (chave do NFC), basta trocar para false.
+         */
+        const val MANTER_SAMSUNG_POR_BAIXO = true
+        const val EVENTO_ATRASADO_MS = 2_500L
+
         const val TAG_ABRINDO = "abrindo"
         const val TAG_PERGUNTA = "pergunta"
 
