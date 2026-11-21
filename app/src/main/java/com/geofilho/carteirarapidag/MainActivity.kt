@@ -8,6 +8,7 @@ import android.provider.Settings
 import android.view.View
 import android.widget.Button
 import android.widget.ScrollView
+import android.widget.Switch
 import android.widget.TextView
 
 class MainActivity : Activity() {
@@ -38,6 +39,12 @@ class MainActivity : Activity() {
         fun avisar(texto: Int) {
             aviso.setText(texto)
             aviso.visibility = View.VISIBLE
+        }
+        val swDiag = findViewById<Switch>(R.id.sw_diagnostico)
+        swDiag.isChecked = Carteiras.diagnosticoLigado(this)
+        swDiag.setOnCheckedChangeListener { _, ligado ->
+            Carteiras.definirDiagnostico(this, ligado)
+            avisar(if (ligado) R.string.diag_ligado else R.string.diag_desligado)
         }
         findViewById<Button>(R.id.btn_enviar_diag).setOnClickListener {
             avisar(R.string.diag_enviando)

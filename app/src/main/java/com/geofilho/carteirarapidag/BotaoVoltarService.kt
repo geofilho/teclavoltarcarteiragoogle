@@ -29,7 +29,7 @@ import android.widget.TextView
  *
  * NFC (só quando ele estava desligado):
  * 1. A camada pergunta "Ativar NFC?". Ao ligar, a Carteira do Google abre sozinha.
- * 2. Ao sair da Carteira do Google, a camada pergunta "Desativar NFC?".
+ * 2. Ao sair da Carteira do Google, abre direto a chave do NFC.
  * 3. Ao desligar, volta para o mostrador do relógio.
  */
 class BotaoVoltarService : AccessibilityService() {
@@ -40,6 +40,9 @@ class BotaoVoltarService : AccessibilityService() {
 
     private var ultimaTroca = 0L
     private var tentativas = 0
+
+    /** Último app de verdade na frente (sem contar telas do sistema e as nossas). */
+    private var pacoteAnterior: String? = null
 
     /** A Carteira do Google mandou evento de abertura depois do nosso pedido. */
     private var googleAvisouAbertura = false
@@ -88,10 +91,19 @@ class BotaoVoltarService : AccessibilityService() {
         val pacote = event.packageName?.toString() ?: return
         if (pacote == packageName) return // nossas próprias telas e camada
         Carteiras.registrarAppDetectado(this, pacote)
+        val anterior = pacoteAnterior
+        if (pacote !in PACOTES_IGNORADOS) pacoteAnterior = pacote
 
         if (Carteiras.ehSamsungWallet(pacote)) {
             Carteiras.registrar(this, "abriu Samsung Wallet / ${event.className}")
-            trocarSamsungWallet()
+            val saindoDaCarteira = anterior == Carteiras.GOOGLE_WALLET && camada == null &&
+                SystemClock.uptimeMillis() - ultimaTroca > MESMA_ABERTURA_MS
+            if (saindoDaCarteira) {
+                // A Samsung Wallet só reapareceu porque a pessoa saiu da Carteira do Google
+                saiuDaCarteira(pacote)
+            } else {
+                trocarSamsungWallet()
+            }
             return
         }
         if (pacote == Carteiras.GOOGLE_WALLET) {
@@ -224,7 +236,7 @@ class BotaoVoltarService : AccessibilityService() {
         mostrarPergunta(R.string.pergunta_ativar_nfc, sim = {
             Carteiras.registrar(this, "Ativar NFC? sim")
             Carteiras.marcarEsperaNfc(this)
-            Carteiras.abrirAjustesNfc(this)
+            if (!Carteiras.abrirAjustesNfcAutorizado(this)) Carteiras.abrirAjustesNfc(this)
             handler.postDelayed({ removerCamada() }, ATRASO_TIRAR_MS)
         }, nao = {
             Carteiras.registrar(this, "Ativar NFC? não")
@@ -232,19 +244,6 @@ class BotaoVoltarService : AccessibilityService() {
             abrirCarteiraComCamada()
         })
         Carteiras.registrar(this, "mostrou Ativar NFC?")
-    }
-
-    private fun mostrarPerguntaDesligar() {
-        mostrarPergunta(R.string.pergunta_desativar_nfc, sim = {
-            Carteiras.registrar(this, "Desativar NFC? sim")
-            Carteiras.marcarEsperaDesligar(this)
-            Carteiras.abrirAjustesNfc(this)
-            handler.postDelayed({ removerCamada() }, ATRASO_TIRAR_MS)
-        }, nao = {
-            Carteiras.registrar(this, "Desativar NFC? não")
-            removerCamada()
-        })
-        Carteiras.registrar(this, "mostrou Desativar NFC?")
     }
 
     private fun mostrarPergunta(texto: Int, sim: () -> Unit, nao: () -> Unit) {
@@ -260,17 +259,32 @@ class BotaoVoltarService : AccessibilityService() {
         }
     }
 
-    /** Só age quando foi o app que ligou o NFC. */
+    /** Saída para outro app: só interessa quando foi o app que ligou o NFC. */
     private fun acompanharSaidaDaCarteira(pacote: String) {
         if (!Carteiras.nfcLigadoPeloApp(this)) return
         if (pacote in PACOTES_IGNORADOS) return
-        if (!viuGoogleWallet || Carteiras.nfcDesligado(this)) return
+        if (!viuGoogleWallet) return
+        saiuDaCarteira(pacote)
+    }
 
-        // Saiu da Carteira do Google: pergunta uma única vez se quer desligar o NFC
+    /**
+     * A pessoa saiu da Carteira do Google.
+     * - Se foi o app que ligou o NFC: abre direto a chave do NFC; ao desligar, volta ao mostrador.
+     * - Senão, se a Samsung Wallet reapareceu por baixo: volta ao mostrador.
+     */
+    private fun saiuDaCarteira(destino: String) {
         viuGoogleWallet = false
-        Carteiras.marcarNfcLigadoPeloApp(this, false)
-        Carteiras.registrar(this, "saiu da Carteira do Google para $pacote")
-        handler.postDelayed({ mostrarPerguntaDesligar() }, ATRASO_TIRAR_MS)
+        if (Carteiras.nfcLigadoPeloApp(this) && !Carteiras.nfcDesligado(this)) {
+            Carteiras.marcarNfcLigadoPeloApp(this, false)
+            Carteiras.marcarEsperaDesligar(this)
+            val ok = Carteiras.abrirAjustesNfcAutorizado(this)
+            Carteiras.registrar(this, "saiu da Carteira do Google para $destino: abrindo a chave do NFC (${if (ok) "ok" else "falhou"})")
+            return
+        }
+        if (Carteiras.ehSamsungWallet(destino)) {
+            Carteiras.registrar(this, "saiu da Carteira do Google e a Samsung Wallet reapareceu: voltando ao mostrador")
+            performGlobalAction(GLOBAL_ACTION_HOME)
+        }
     }
 
     private fun inflar(layout: Int): View? = try {

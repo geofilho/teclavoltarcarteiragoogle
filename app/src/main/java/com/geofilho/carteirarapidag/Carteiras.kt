@@ -39,34 +39,47 @@ object Carteiras {
         }
 
     /**
-     * Abre a Carteira do Google por um PendingIntent com a autorização explícita de abertura em
-     * segundo plano exigida pelo Android 14+ (o app tem o privilégio por ser serviço de acessibilidade,
-     * mas o Android só o usa quando o app declara isso).
+     * Abre uma tela por um PendingIntent com a autorização explícita de abertura em segundo plano
+     * exigida pelo Android 14+ (o app tem o privilégio por ser serviço de acessibilidade, mas o
+     * Android só o usa quando o app declara isso).
      */
+    fun abrirAutorizado(context: Context, intent: Intent, codigo: Int): Boolean = try {
+        val modo = if (Build.VERSION.SDK_INT >= 36) {
+            ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
+        } else {
+            @Suppress("DEPRECATION")
+            ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
+        }
+        val criador = ActivityOptions.makeBasic()
+        if (Build.VERSION.SDK_INT >= 34) criador.setPendingIntentCreatorBackgroundActivityStartMode(modo)
+        val pendente = PendingIntent.getActivity(
+            context, codigo, intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            criador.toBundle(),
+        )
+        val envio = ActivityOptions.makeBasic()
+        if (Build.VERSION.SDK_INT >= 34) envio.setPendingIntentBackgroundActivityStartMode(modo)
+        pendente.send(context, 0, null, null, null, null, envio.toBundle())
+        true
+    } catch (e: Exception) {
+        registrar(context, "abertura autorizada falhou: ${e.javaClass.simpleName}")
+        false
+    }
+
     fun abrirGoogleWalletAutorizado(context: Context): Boolean {
         val intent = intentGoogleWallet(context) ?: return false
-        return try {
-            val modo = if (Build.VERSION.SDK_INT >= 36) {
-                ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
-            } else {
-                @Suppress("DEPRECATION")
-                ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED
-            }
-            val criador = ActivityOptions.makeBasic()
-            if (Build.VERSION.SDK_INT >= 34) criador.setPendingIntentCreatorBackgroundActivityStartMode(modo)
-            val pendente = PendingIntent.getActivity(
-                context, 7, intent,
-                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-                criador.toBundle(),
-            )
-            val envio = ActivityOptions.makeBasic()
-            if (Build.VERSION.SDK_INT >= 33) envio.setPendingIntentBackgroundActivityStartMode(modo)
-            pendente.send(context, 0, null, null, null, null, envio.toBundle())
-            true
-        } catch (e: Exception) {
-            registrar(context, "PendingIntent falhou: ${e.javaClass.simpleName}")
-            abrirGoogleWallet(context)
-        }
+        return abrirAutorizado(context, intent, 7) || abrirGoogleWallet(context)
+    }
+
+    /** Abre a chave do NFC com a abertura autorizada (usada pelo serviço, em segundo plano). */
+    fun abrirAjustesNfcAutorizado(context: Context): Boolean {
+        val pm = context.packageManager
+        val intent = listOf(
+            Intent(Settings.ACTION_NFC_SETTINGS),
+            Intent(Settings.ACTION_WIRELESS_SETTINGS),
+            Intent(Settings.ACTION_SETTINGS),
+        ).firstOrNull { it.resolveActivity(pm) != null } ?: return false
+        return abrirAutorizado(context, intent, 8)
     }
 
     fun googleWalletInstalada(context: Context): Boolean = intentGoogleWallet(context) != null
@@ -99,7 +112,7 @@ object Carteiras {
 
     private const val PREFS = "carteira_rapida_g"
     private const val CHAVE_ESPERANDO_NFC = "esperando_nfc_desde"
-    private const val ESPERA_NFC_MS = 3 * 60 * 1000L
+    private const val ESPERA_NFC_MS = 2 * 60 * 1000L
 
     /** Lembra que, assim que o NFC for ligado, a Carteira do Google deve abrir sozinha. */
     fun marcarEsperaNfc(context: Context) {
@@ -134,8 +147,23 @@ object Carteiras {
         return System.currentTimeMillis() - desde < ESPERA_NFC_MS
     }
 
+    private const val CHAVE_DIAGNOSTICO = "diagnostico_ligado"
+
+    /** Coleta de diagnóstico (registro de eventos e últimos apps). Ligada por padrão. */
+    fun diagnosticoLigado(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(CHAVE_DIAGNOSTICO, true)
+
+    /** Liga ou desliga a coleta. Ao desligar, apaga tudo o que foi coletado. */
+    fun definirDiagnostico(context: Context, ligado: Boolean) {
+        val editor = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean(CHAVE_DIAGNOSTICO, ligado)
+        if (!ligado) editor.remove(CHAVE_APPS_DETECTADOS).remove(CHAVE_REGISTRO)
+        editor.apply()
+    }
+
     /** Guarda os últimos apps que apareceram na tela, para diagnóstico na tela Como usar. */
     fun registrarAppDetectado(context: Context, pacote: String) {
+        if (!diagnosticoLigado(context)) return
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val lista = appsDetectados(context)
         if (lista.firstOrNull() == pacote) return
@@ -147,10 +175,11 @@ object Carteiras {
 
     /** Registro com horário dos últimos eventos, para o diagnóstico. */
     fun registrar(context: Context, linha: String) {
+        if (!diagnosticoLigado(context)) return
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val hora = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.ROOT).format(java.util.Date())
         val atual = registro(context)
-        val nova = (atual + "$hora $linha").takeLast(25)
+        val nova = (atual + "$hora $linha").takeLast(40)
         prefs.edit().putString(CHAVE_REGISTRO, nova.joinToString("\n")).apply()
     }
 

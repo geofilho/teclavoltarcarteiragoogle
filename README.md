@@ -18,10 +18,13 @@ Não precisa da permissão de sobreposição de tela. O Android 14+ (o relógio 
 Nenhum app comum consegue ligar o NFC, porque o Android só permite isso aos apps do sistema.
 
 - Se o NFC estiver desligado, aparece só a pergunta **Ativar NFC?**. Com **Sim**, abre a chave do NFC; ao ligar, a Carteira do Google abre sozinha. Com **Não**, a Carteira do Google abre mesmo assim.
-- Ao sair da Carteira do Google, aparece **Desativar NFC?**. Com **Sim** e a chave desligada, o app volta para o mostrador.
-- Se o NFC já estava ligado, nenhuma pergunta aparece.
+- Ao sair da Carteira do Google, a chave do NFC abre direto, sem pergunta. Ao desligar, o app volta para o mostrador.
+- Se o NFC já estava ligado, nada disso aparece. Ao sair da Carteira do Google, se a Samsung Wallet reaparecer por baixo, o app volta para o mostrador em vez de abrir a Carteira do Google de novo.
 
 ### Diagnóstico
+
+A chave **Coletar diagnóstico** vem ligada. Ela guarda no relógio só os nomes dos últimos apps que abriram e um registro do que o app fez. Nada sai do relógio sem um toque em Enviar diagnóstico. Ao desligar a chave, a coleta para e os dados são apagados.
+
 
 O botão **Enviar diagnóstico** abre no celular a página do GitHub com um relatório já preenchido: versão, relógio, permissão, NFC, apps de carteira instalados e últimos apps que abriram. Basta tocar em criar. O botão **Copiar diagnóstico** copia o mesmo relatório. A tela "Como usar" também mostra os últimos apps que abriram. Se a troca não funcionar, essa lista mostra o nome do pacote da Samsung Wallet no relógio, para adicionar em `Carteiras.kt`.
 

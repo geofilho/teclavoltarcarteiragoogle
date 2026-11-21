@@ -51,6 +51,16 @@
             android:text="@string/btn_testar"
             android:visibility="gone" />
 
+        <Switch
+            android:id="@+id/sw_diagnostico"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:minHeight="52dp"
+            android:text="@string/sw_diagnostico"
+            android:textColor="?android:attr/textColorPrimary"
+            android:textSize="16sp" />
+
         <Button
             android:id="@+id/btn_enviar_diag"
             style="@style/BotaoG"
