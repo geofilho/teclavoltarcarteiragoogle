@@ -156,13 +156,21 @@ class BotaoVoltarService : AccessibilityService() {
      * 1ª vez: se não for a Carteira do Google, pede de novo.
      * 2ª vez: se ainda não for, mostra a pergunta "Abrir Carteira do Google?" (o toque libera a abertura).
      */
-    private fun verificar(etapa: Int) {
+    private fun verificar(etapa: Int, esperas: Int = 0) {
         if (camada?.tag != TAG_ABRINDO) return
         val topo = pacoteDoTopo()
         Carteiras.registrar(this, "verificação $etapa: topo=$topo; janelas=${descreverJanelas()}")
-        val naFrente = topo == Carteiras.GOOGLE_WALLET || (topo == null && googleAvisouAbertura)
-        if (naFrente) {
+        if (topo == Carteiras.GOOGLE_WALLET) {
             removerCamada()
+            // Confere mais uma vez, só para o registro, se ela continuou na frente
+            handler.postDelayed({
+                Carteiras.registrar(this, "1,5 s depois: topo=${pacoteDoTopo()}")
+            }, 1_500L)
+            return
+        }
+        if (topo == null && esperas < MAX_ESPERAS) {
+            // Nenhum app na tela ainda (troca em andamento): espera mais um pouco sem repetir
+            handler.postDelayed({ verificar(etapa, esperas + 1) }, ESPERA_SEM_APP_MS)
             return
         }
         when (etapa) {
@@ -325,6 +333,8 @@ class BotaoVoltarService : AccessibilityService() {
         const val ATRASO_TIRAR_MS = 600L
         const val ATRASO_NFC_MS = 400L
         const val VERIFICAR_MS = 1_000L
+        const val ESPERA_SEM_APP_MS = 700L
+        const val MAX_ESPERAS = 4
 
         /** Telas que aparecem por cima da Carteira do Google sem que a pessoa tenha saído dela. */
         val PACOTES_IGNORADOS = setOf(
