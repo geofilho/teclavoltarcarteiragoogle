@@ -17,7 +17,8 @@ Não precisa da permissão de sobreposição de tela. O Android 14+ (o relógio 
 
 Nenhum app comum consegue ligar o NFC, porque o Android só permite isso aos apps do sistema.
 
-- Se o NFC estiver desligado, aparece só a pergunta **Ativar NFC?**. Com **Sim**, abre a chave do NFC; ao ligar, a Carteira do Google abre sozinha. Com **Não**, a Carteira do Google abre mesmo assim.
+- A Samsung Wallet liga o NFC sozinha ao abrir e desliga ao fechar. Por isso o app cobre a tela e espera o NFC parar de mudar (de 0,9 a 3 s) antes de decidir.
+- Se o NFC estiver desligado, a chave do NFC abre direto, sem pergunta. Ao ligar, a Carteira do Google abre sozinha.
 - Ao sair da Carteira do Google, a chave do NFC abre direto, sem pergunta. Ao desligar, o app volta para o mostrador.
 - Se o NFC já estava ligado, nada disso aparece. Ao sair da Carteira do Google, se a Samsung Wallet reaparecer por baixo, o app volta para o mostrador em vez de abrir a Carteira do Google de novo.
 

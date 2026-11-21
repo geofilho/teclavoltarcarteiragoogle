@@ -28,7 +28,7 @@ import android.widget.TextView
  * não precisa de permissão extra) e, com ela visível, abre a Carteira do Google.
  *
  * NFC (só quando ele estava desligado):
- * 1. A camada pergunta "Ativar NFC?". Ao ligar, a Carteira do Google abre sozinha.
+ * 1. Abre direto a chave do NFC. Ao ligar, a Carteira do Google abre sozinha.
  * 2. Ao sair da Carteira do Google, abre direto a chave do NFC.
  * 3. Ao desligar, volta para o mostrador do relógio.
  */
@@ -39,6 +39,9 @@ class BotaoVoltarService : AccessibilityService() {
     private var camada: View? = null
 
     private var ultimaTroca = 0L
+
+    /** Momento da última mudança do NFC (a Samsung Wallet liga e desliga o NFC sozinha). */
+    private var ultimaMudancaNfc = 0L
     private var tentativas = 0
 
     /** Último app de verdade na frente (sem contar telas do sistema e as nossas). */
@@ -53,6 +56,7 @@ class BotaoVoltarService : AccessibilityService() {
     private val receptorNfc = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             val estado = intent.getIntExtra(NfcAdapter.EXTRA_ADAPTER_STATE, NfcAdapter.STATE_OFF)
+            ultimaMudancaNfc = SystemClock.uptimeMillis()
             if (estado == NfcAdapter.STATE_ON || estado == NfcAdapter.STATE_OFF) {
                 Carteiras.registrar(context, "aviso do sistema: NFC ${if (estado == NfcAdapter.STATE_ON) "ligado" else "desligado"}")
             }
@@ -143,7 +147,43 @@ class BotaoVoltarService : AccessibilityService() {
         }
         ultimaTroca = agora
 
-        if (Carteiras.nfcDesligado(this)) mostrarPerguntaLigar() else abrirCarteiraComCamada()
+        // A Samsung Wallet liga o NFC ao abrir e desliga ao fechar. Cobre a tela e espera o NFC
+        // parar de mudar antes de decidir entre abrir a Carteira do Google ou a chave do NFC.
+        inflar(R.layout.camada_abrindo)?.let {
+            it.tag = TAG_ABRINDO
+            mostrarCamada(it)
+        }
+        handler.postDelayed({ decidirQuandoEstavel() }, ESTABILIZAR_MIN_MS)
+    }
+
+    private fun decidirQuandoEstavel() {
+        val agora = SystemClock.uptimeMillis()
+        val nfcAindaMudando = agora - ultimaMudancaNfc < NFC_PARADO_MS
+        if (nfcAindaMudando && agora - ultimaTroca < ESTABILIZAR_MAX_MS) {
+            handler.postDelayed({ decidirQuandoEstavel() }, 250L)
+            return
+        }
+        if (Carteiras.nfcDesligado(this)) abrirChaveParaLigar() else abrirCarteiraComCamada()
+    }
+
+    /** NFC desligado: abre direto a chave do NFC; ao ligar, a Carteira do Google abre sozinha. */
+    private fun abrirChaveParaLigar() {
+        Carteiras.marcarEsperaNfc(this)
+        val ok = Carteiras.abrirAjustesNfcAutorizado(this) || run {
+            Carteiras.abrirAjustesNfc(this)
+            false
+        }
+        Carteiras.registrar(this, "NFC desligado: abrindo a chave do NFC (${if (ok) "ok" else "sem autorização"})")
+        handler.postDelayed({ removerCamada() }, ATRASO_TIRAR_MS)
+        // Se o NFC já estiver ligado quando a chave abrir, segue para a Carteira do Google
+        handler.postDelayed({
+            if (!Carteiras.nfcDesligado(this) && Carteiras.consumirEsperaNfc(this)) {
+                Carteiras.registrar(this, "NFC já estava ligado na chave: abrindo a Carteira do Google")
+                Carteiras.marcarNfcLigadoPeloApp(this, true)
+                viuGoogleWallet = false
+                abrirCarteiraComCamada()
+            }
+        }, CONFERIR_CHAVE_MS)
     }
 
     /** Cobre a tela, abre a Carteira do Google e confere se ela ficou mesmo na frente. */
@@ -230,20 +270,6 @@ class BotaoVoltarService : AccessibilityService() {
         }
     } catch (e: Exception) {
         "indisponível"
-    }
-
-    private fun mostrarPerguntaLigar() {
-        mostrarPergunta(R.string.pergunta_ativar_nfc, sim = {
-            Carteiras.registrar(this, "Ativar NFC? sim")
-            Carteiras.marcarEsperaNfc(this)
-            if (!Carteiras.abrirAjustesNfcAutorizado(this)) Carteiras.abrirAjustesNfc(this)
-            handler.postDelayed({ removerCamada() }, ATRASO_TIRAR_MS)
-        }, nao = {
-            Carteiras.registrar(this, "Ativar NFC? não")
-            removerCamada()
-            abrirCarteiraComCamada()
-        })
-        Carteiras.registrar(this, "mostrou Ativar NFC?")
     }
 
     private fun mostrarPergunta(texto: Int, sim: () -> Unit, nao: () -> Unit) {
@@ -348,6 +374,10 @@ class BotaoVoltarService : AccessibilityService() {
         const val ATRASO_NFC_MS = 400L
         const val VERIFICAR_MS = 1_000L
         const val ESPERA_SEM_APP_MS = 700L
+        const val ESTABILIZAR_MIN_MS = 900L
+        const val ESTABILIZAR_MAX_MS = 3_000L
+        const val NFC_PARADO_MS = 800L
+        const val CONFERIR_CHAVE_MS = 1_500L
         const val MAX_ESPERAS = 4
 
         /** Telas que aparecem por cima da Carteira do Google sem que a pessoa tenha saído dela. */
