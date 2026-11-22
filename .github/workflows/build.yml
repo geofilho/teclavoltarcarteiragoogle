@@ -41,3 +41,18 @@ jobs:
           body: "APK pronto para instalar no Galaxy Watch. Gerado automaticamente a partir do commit ${{ github.sha }}."
           files: CarteiraRapidaG.apk
           make_latest: true
+
+      # Guarda também cada versão numa publicação própria (o link da última versão não muda).
+      - name: Ler a versão
+        id: v
+        run: echo "nome=$(grep -ohP 'versionName\s*=\s*"\K[^"]+' app/build.gradle*)" >> "$GITHUB_OUTPUT"
+
+      - name: Guardar esta versão (histórico)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Carteira Rápida G ${{ steps.v.outputs.nome }} (build ${{ github.run_number }})
+          make_latest: false
+          target_commitish: ${{ github.sha }}
+          body: "Versão ${{ steps.v.outputs.nome }}, gerada do commit ${{ github.sha }}."
+          files: CarteiraRapidaG.apk
