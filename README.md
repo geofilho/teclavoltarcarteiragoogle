@@ -1,5 +1,11 @@
 # Carteira Rápida G
 
+## Autoria e direitos autorais
+
+Este projeto é de autoria de **geofilho** ([github.com/geofilho](https://github.com/geofilho)). Todos os direitos são reservados (veja [LICENSE](LICENSE)).
+
+Você pode usar o projeto como inspiração para criar o seu próprio, com código, nome e identidade diferentes. Copiar, clonar ou republicar este app, mesmo trocando só nomes ou ícones, exige autorização do autor: [abra uma issue](https://github.com/geofilho/teclavoltarcarteiragoogle/issues) para pedir.
+
 App para Wear OS (feito para o Galaxy Watch Ultra 2, funciona do Galaxy Watch 4 em diante) que faz o gesto **segurar o botão Voltar** abrir a **Carteira do Google** em vez da Samsung Wallet.
 
 ## Como funciona
