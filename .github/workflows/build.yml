@@ -56,3 +56,17 @@ jobs:
           target_commitish: ${{ github.sha }}
           body: "Versão ${{ steps.v.outputs.nome }}, gerada do commit ${{ github.sha }}."
           files: CarteiraRapidaG.apk
+
+      # A página de versões fica só com as duas últimas versões numeradas (build-N).
+      # A publicação fixa "ultima-versao" não é apagada.
+      - name: Manter só as duas últimas versões
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 200 --json tagName -q '.[].tagName' |
+          grep -E '^build-[0-9]' | sort -V -r | tail -n +3 |
+          while read -r tag; do
+            gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag
+            echo "$tag apagada da página de versões"
+          done
+
